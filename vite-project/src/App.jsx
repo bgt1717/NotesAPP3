@@ -11,7 +11,7 @@ function App() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
-  const [addingNote, setAddingNote] = useState(false); // toggles + form
+  const [addingNote, setAddingNote] = useState(false);
 
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editTitle, setEditTitle] = useState("");
@@ -41,6 +41,19 @@ function App() {
         .catch((err) => console.error(err));
     }
   }, [token]);
+
+  // Prepend bullet to new lines automatically
+  const handleContentChange = (setter) => (e) => {
+    const value = e.target.value;
+    // Add bullet at start if empty
+    let newValue = value;
+    if (!value.startsWith("• ")) {
+      newValue = "• " + value;
+    }
+    // Replace newline without bullet
+    newValue = newValue.replace(/\n(?!• )/g, "\n• ");
+    setter(newValue);
+  };
 
   const handleAddNote = async () => {
     if (!title || !content) return;
@@ -179,16 +192,9 @@ function App() {
         <button onClick={handleLogout}>Logout</button>
       </header>
 
-      {/* + button to toggle add note form */}
       {!addingNote ? (
         <button
-          style={{
-            fontSize: "1.5rem",
-            padding: "10px 20px",
-            borderRadius: "12px",
-            marginBottom: "20px",
-            cursor: "pointer",
-          }}
+          className="add-note-button"
           onClick={() => setAddingNote(true)}
         >
           + Add Note
@@ -205,9 +211,9 @@ function App() {
             className="note-textarea"
             placeholder="Content"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={handleContentChange(setContent)}
           ></textarea>
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div className="actions">
             <button onClick={handleAddNote}>Add</button>
             <button
               onClick={() => {
@@ -215,7 +221,6 @@ function App() {
                 setTitle("");
                 setContent("");
               }}
-              style={{ backgroundColor: "#f44336" }}
             >
               Cancel
             </button>
@@ -236,7 +241,7 @@ function App() {
                 <textarea
                   className="note-textarea"
                   value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
+                  onChange={handleContentChange(setEditContent)}
                 />
                 <div className="actions">
                   <button onClick={() => saveEdit(note._id)}>Save</button>
@@ -248,7 +253,7 @@ function App() {
                 <h3>{note.title}</h3>
                 <ul>
                   {note.content.split("\n").map((line, i) => (
-                    <li key={i}>{line}</li>
+                    <li key={i}>{line.replace(/^• /, "")}</li>
                   ))}
                 </ul>
                 <div className="timestamp">
