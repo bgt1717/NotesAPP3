@@ -7,7 +7,6 @@ const API = "http://localhost:5000";
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [notes, setNotes] = useState([]);
-  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
   const [title, setTitle] = useState("");
@@ -15,8 +14,6 @@ function App() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  /* ---------------- AUTH ---------------- */
 
   const logout = () => {
     setToken("");
@@ -63,26 +60,23 @@ function App() {
     }
   };
 
-  /* ---------------- NOTES ---------------- */
-
   const fetchNotes = async (jwt = token) => {
     if (!jwt) return;
-
     const res = await fetch(`${API}/notes`, {
       headers: { Authorization: `Bearer ${jwt}` },
     });
-
     const data = await res.json();
     setNotes(data);
   };
 
   const saveNote = async () => {
-    const method = editingId ? "PUT" : "POST";
-    const url = editingId
-      ? `${API}/notes/${editingId}`
-      : `${API}/notes`;
+    const method = editingId && editingId !== "new" ? "PUT" : "POST";
+    const url =
+      editingId && editingId !== "new"
+        ? `${API}/notes/${editingId}`
+        : `${API}/notes`;
 
-    await fetch(url, {
+    const res = await fetch(url, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -91,11 +85,21 @@ function App() {
       body: JSON.stringify({ title, content }),
     });
 
+    const updatedNote = await res.json();
+
     setTitle("");
     setContent("");
     setEditingId(null);
-    setShowForm(false);
-    fetchNotes();
+
+    if (editingId && editingId !== "new") {
+      setNotes((prevNotes) =>
+        prevNotes.map((note) =>
+          note._id === updatedNote._id ? updatedNote : note
+        )
+      );
+    } else {
+      setNotes((prevNotes) => [updatedNote, ...prevNotes]);
+    }
   };
 
   const deleteNote = async (id) => {
@@ -103,65 +107,53 @@ function App() {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-
-    fetchNotes();
+    setNotes((prevNotes) => prevNotes.filter((note) => note._id !== id));
   };
 
   const startEdit = (note) => {
     setEditingId(note._id);
     setTitle(note.title);
     setContent(note.content);
-    setShowForm(true);
   };
 
-  /* ---------------- UTIL ---------------- */
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString();
+  const addNewNote = () => {
+    setEditingId("new");
+    setTitle("");
+    setContent("• ");
   };
 
-  // ---------------- BULLET HANDLING ----------------
+  const formatDate = (dateString) => new Date(dateString).toLocaleString();
+
   const handleContentChange = (e) => {
     const textarea = e.target;
     let value = textarea.value;
     const selectionStart = textarea.selectionStart;
 
-    // If empty, start with bullet
     if (value === "") {
       setContent("• ");
       return;
     }
 
-    // Get the line where the cursor is
     const beforeCursor = value.slice(0, selectionStart);
     const afterCursor = value.slice(selectionStart);
-
     const lines = beforeCursor.split("\n");
     const currentLine = lines[lines.length - 1];
 
-    // If user pressed Enter at any line, add bullet
     if (currentLine === "" || currentLine === "• ") {
       setContent(beforeCursor + "• " + afterCursor);
-
-      // Move cursor to after the bullet
       setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd =
-          beforeCursor.length + 2;
+        textarea.selectionStart = textarea.selectionEnd = beforeCursor.length + 2;
       }, 0);
       return;
     }
 
-    // If user pressed Enter at the very end
     if (value.endsWith("\n")) {
       setContent(value + "• ");
       return;
     }
 
-    // Otherwise just set content
     setContent(value);
   };
-
-  /* ---------------- INIT ---------------- */
 
   useEffect(() => {
     if (token) {
@@ -169,8 +161,6 @@ function App() {
       fetchNotes(token);
     }
   }, []);
-
-  /* ---------------- UI ---------------- */
 
   if (!token) {
     return (
@@ -197,57 +187,88 @@ function App() {
       <header>
         <h1>Notes</h1>
         <div>
-          <button
-            onClick={() => {
-              setShowForm(true);
-              setEditingId(null);
-              setTitle("");
-              setContent("• "); // start new note with bullet
-            }}
-          >
-            ＋
-          </button>
+          <button onClick={addNewNote}>＋</button>
           <button onClick={logout}>Logout</button>
         </div>
       </header>
 
-      {showForm && (
-        <div className="note-form">
-          <input
-            placeholder="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <textarea
-            placeholder="• Start typing..."
-            value={content}
-            onChange={handleContentChange}
-          />
-          <button onClick={saveNote}>
-            {editingId ? "Update Note" : "Add Note"}
-          </button>
-        </div>
-      )}
-
       <div className="notes">
+        {editingId === "new" && (
+          <div className="note">
+            <input
+              className="note-input"
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <textarea
+              className="note-textarea"
+              placeholder="• Start typing..."
+              value={content}
+              onChange={handleContentChange}
+            />
+            <div className="actions">
+              <button onClick={saveNote}>Add Note</button>
+              <button
+                onClick={() => {
+                  setEditingId(null);
+                  setTitle("");
+                  setContent("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {notes.map((note) => (
           <div key={note._id} className="note">
-            <h3>{note.title}</h3>
-            <ul>
-              {note.content
-                .split("\n")
-                .filter(Boolean)
-                .map((line, i) => (
-                  <li key={i}>{line.replace(/^•\s?/, "")}</li>
-                ))}
-            </ul>
-            <small className="timestamp">
-              Last updated: {formatDate(note.updatedAt)}
-            </small>
-            <div className="actions">
-              <button onClick={() => startEdit(note)}>Edit</button>
-              <button onClick={() => deleteNote(note._id)}>Delete</button>
-            </div>
+            {editingId === note._id ? (
+              <>
+                <input
+                  className="note-input"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+                <textarea
+                  className="note-textarea"
+                  value={content}
+                  onChange={handleContentChange}
+                />
+                <div className="actions">
+                  <button onClick={saveNote}>Save</button>
+                  <button
+                    onClick={() => {
+                      setEditingId(null);
+                      setTitle("");
+                      setContent("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3>{note.title}</h3>
+                <ul>
+                  {note.content
+                    .split("\n")
+                    .filter(Boolean)
+                    .map((line, i) => (
+                      <li key={i}>{line.replace(/^•\s?/, "")}</li>
+                    ))}
+                </ul>
+                <small className="timestamp">
+                  Last updated: {formatDate(note.updatedAt)}
+                </small>
+                <div className="actions">
+                  <button onClick={() => startEdit(note)}>Edit</button>
+                  <button onClick={() => deleteNote(note._id)}>Delete</button>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
