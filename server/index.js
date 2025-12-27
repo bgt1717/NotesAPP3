@@ -42,11 +42,18 @@ app.post("/auth/register", async (req, res) => {
     const user = new User({ email, password: hashedPassword });
     await user.save();
 
-    res.status(201).json({ message: "User registered" });
+    // Sign JWT immediately upon registration
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    // Return token so frontend can auto-login
+    res.status(201).json({ token });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 
 // Login user

@@ -1,85 +1,51 @@
-import { useEffect, useState } from "react";
-import jwtDecode from "jwt-decode";
+import { useState, useEffect } from "react";
+// Vite-compatible jwt-decode import
+import { default as jwtDecode } from "jwt-decode";
 import "./App.css";
 
 const API = "http://localhost:5000";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [user, setUser] = useState(null);
   const [notes, setNotes] = useState([]);
-  const [editingId, setEditingId] = useState(null);
-
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  /* ---------------- AUTH ---------------- */
-  const logout = () => {
-    setToken("");
-    localStorage.removeItem("token");
-    setNotes([]);
-    alert("Logged out or session expired.");
-  };
-
-  const scheduleAutoLogout = (token) => {
-    try {
-      const decoded = jwtDecode(token);
-      const expiresAt = decoded.exp * 1000;
-      const timeLeft = expiresAt - Date.now();
-
-      if (timeLeft <= 0) {
-        logout();
-        return;
+  // Decode JWT whenever token changes
+  useEffect(() => {
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setUser(decoded);
+      } catch (err) {
+        console.error("Invalid token", err);
+        setUser(null);
       }
-
-      setTimeout(() => {
-        logout();
-      }, timeLeft);
-    } catch {
-      logout();
-    }
-  };
-
-  const login = async () => {
-    const res = await fetch(`${API}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await res.json();
-
-    if (data.token) {
-      setToken(data.token);
-      localStorage.setItem("token", data.token);
-      scheduleAutoLogout(data.token);
-      fetchNotes(data.token);
     } else {
-      alert(data.message || "Login failed");
+      setUser(null);
     }
-  };
+  }, [token]);
 
-  /* ---------------- NOTES ---------------- */
-  const fetchNotes = async (jwt = token) => {
-    if (!jwt) return;
+  // Fetch notes for logged-in user
+  useEffect(() => {
+    if (token) {
+      fetch(`${API}/notes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data) => setNotes(data))
+        .catch((err) => console.error(err));
+    }
+  }, [token]);
+
+  // Add new note
+  const handleAddNote = async () => {
+    if (!title || !content) return;
+
     const res = await fetch(`${API}/notes`, {
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    const data = await res.json();
-    setNotes(data);
-  };
-
-  const saveNote = async () => {
-    const method = editingId && editingId !== "new" ? "PUT" : "POST";
-    const url =
-      editingId && editingId !== "new"
-        ? `${API}/notes/${editingId}`
-        : `${API}/notes`;
-
-    const res = await fetch(url, {
-      method,
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -87,206 +53,141 @@ function App() {
       body: JSON.stringify({ title, content }),
     });
 
-    const updatedNote = await res.json();
-
+    const newNote = await res.json();
+    setNotes([...notes, newNote]);
     setTitle("");
     setContent("");
-    setEditingId(null);
-
-    if (editingId && editingId !== "new") {
-      setNotes((prevNotes) =>
-        prevNotes.map((note) =>
-          note._id === updatedNote._id ? updatedNote : note
-        )
-      );
-    } else {
-      setNotes((prevNotes) => [updatedNote, ...prevNotes]);
-    }
   };
 
-  const deleteNote = async (id) => {
+  // Delete note
+  const handleDelete = async (id) => {
     await fetch(`${API}/notes/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-    setNotes((prevNotes) => prevNotes.filter((note) => note._id !== id));
+    setNotes(notes.filter((note) => note._id !== id));
   };
 
-  const startEdit = (note) => {
-    setEditingId(note._id);
-    setTitle(note.title);
-    setContent(note.content);
+  // Logout
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setToken("");
+    setUser(null);
   };
 
-  const addNewNote = () => {
-    setEditingId("new");
-    setTitle("");
-    setContent("• ");
+  // Login
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+
+    const res = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+    } else {
+      alert(data.message || "Login failed");
+    }
   };
 
-  /* ---------------- UTIL ---------------- */
-  const formatDate = (dateString) => new Date(dateString).toLocaleString();
+  // Register
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
 
-  const handleContentChange = (e) => {
-    const textarea = e.target;
-    let value = textarea.value;
-    const selectionStart = textarea.selectionStart;
+    const res = await fetch(`${API}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
-    if (value === "") {
-      setContent("• ");
-      return;
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+      setIsRegistering(false);
+    } else {
+      alert(data.message || "Registration failed");
     }
-
-    const beforeCursor = value.slice(0, selectionStart);
-    const afterCursor = value.slice(selectionStart);
-    const lines = beforeCursor.split("\n");
-    const currentLine = lines[lines.length - 1];
-
-    if (currentLine === "" || currentLine === "• ") {
-      setContent(beforeCursor + "• " + afterCursor);
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = beforeCursor.length + 2;
-      }, 0);
-      return;
-    }
-
-    if (value.endsWith("\n")) {
-      setContent(value + "• ");
-      return;
-    }
-
-    setContent(value);
   };
 
-  /* ---------------- INIT ---------------- */
-  useEffect(() => {
-    if (token) {
-      scheduleAutoLogout(token);
-      fetchNotes(token);
-    }
-  }, []);
-
-  /* ---------------- LOGIN / REGISTER ---------------- */
-  if (!token) {
+  // Auth form
+  if (!user) {
     return (
       <div className="auth">
-        <h2>Login / Register</h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            login();
-          }}
-        >
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button type="submit">Login</button>
+        <h2>{isRegistering ? "Register" : "Login"}</h2>
+        <form onSubmit={isRegistering ? handleRegister : handleLogin}>
+          <input placeholder="Email" name="email" type="email" required />
+          <input placeholder="Password" name="password" type="password" required />
+          <button type="submit">{isRegistering ? "Register" : "Login"}</button>
         </form>
+        <p style={{ marginTop: "10px" }}>
+          {isRegistering ? "Already have an account?" : "Don't have an account?"}{" "}
+          <button
+            onClick={() => setIsRegistering(!isRegistering)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#2196f3",
+              cursor: "pointer",
+              textDecoration: "underline",
+              padding: 0,
+              fontSize: "1rem",
+            }}
+          >
+            {isRegistering ? "Login" : "Register"}
+          </button>
+        </p>
       </div>
     );
   }
 
-  /* ---------------- APP UI ---------------- */
+  // Notes app
   return (
-    <div className="app">
+    <div style={{ padding: "20px" }}>
       <header>
-        <h1>Notes</h1>
-        <div>
-          <button onClick={addNewNote}>＋</button>
-          <button onClick={logout}>Logout</button>
-        </div>
+        <h1>Notes App</h1>
+        <button onClick={handleLogout}>Logout</button>
       </header>
 
-      <div className="notes">
-        {/* New Note Form */}
-        {editingId === "new" && (
-          <div className="note">
-            <input
-              className="note-input"
-              placeholder="Title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <textarea
-              className="note-textarea"
-              placeholder="• Start typing..."
-              value={content}
-              onChange={handleContentChange}
-            />
-            <div className="actions">
-              <button onClick={saveNote}>Add Note</button>
-              <button
-                onClick={() => {
-                  setEditingId(null);
-                  setTitle("");
-                  setContent("");
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+      <div className="note-form">
+        <input
+          className="note-input"
+          placeholder="Title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <textarea
+          className="note-textarea"
+          placeholder="Content"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        ></textarea>
+        <button onClick={handleAddNote}>Add Note</button>
+      </div>
 
-        {/* Notes List */}
+      <div className="notes">
         {notes.map((note) => (
-          <div key={note._id} className="note">
-            {editingId === note._id ? (
-              <>
-                <input
-                  className="note-input"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-                <textarea
-                  className="note-textarea"
-                  value={content}
-                  onChange={handleContentChange}
-                />
-                <div className="actions">
-                  <button onClick={saveNote}>Save</button>
-                  <button
-                    onClick={() => {
-                      setEditingId(null);
-                      setTitle("");
-                      setContent("");
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3>{note.title}</h3>
-                <ul>
-                  {note.content
-                    .split("\n")
-                    .filter(Boolean)
-                    .map((line, i) => (
-                      <li key={i}>{line.replace(/^•\s?/, "")}</li>
-                    ))}
-                </ul>
-                <small className="timestamp">
-                  Last updated: {formatDate(note.updatedAt)}
-                </small>
-                <div className="actions">
-                  <button onClick={() => startEdit(note)}>Edit</button>
-                  <button onClick={() => deleteNote(note._id)}>Delete</button>
-                </div>
-              </>
-            )}
+          <div className="note" key={note._id}>
+            <h3>{note.title}</h3>
+            <ul>
+              {note.content.split("\n").map((line, i) => (
+                <li key={i}>{line}</li>
+              ))}
+            </ul>
+            <div className="timestamp">
+              Last updated: {new Date(note.updatedAt).toLocaleString()}
+            </div>
+            <div className="actions">
+              <button onClick={() => handleDelete(note._id)}>Delete</button>
+            </div>
           </div>
         ))}
       </div>
