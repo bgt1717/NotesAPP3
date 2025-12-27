@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { jwtDecode } from "jwt-decode";
+import jwtDecode from "jwt-decode";
 import "./App.css";
 
 const API = "http://localhost:5000";
@@ -15,6 +15,7 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  /* ---------------- AUTH ---------------- */
   const logout = () => {
     setToken("");
     localStorage.removeItem("token");
@@ -60,6 +61,7 @@ function App() {
     }
   };
 
+  /* ---------------- NOTES ---------------- */
   const fetchNotes = async (jwt = token) => {
     if (!jwt) return;
     const res = await fetch(`${API}/notes`, {
@@ -122,6 +124,7 @@ function App() {
     setContent("• ");
   };
 
+  /* ---------------- UTIL ---------------- */
   const formatDate = (dateString) => new Date(dateString).toLocaleString();
 
   const handleContentChange = (e) => {
@@ -155,6 +158,7 @@ function App() {
     setContent(value);
   };
 
+  /* ---------------- INIT ---------------- */
   useEffect(() => {
     if (token) {
       scheduleAutoLogout(token);
@@ -162,26 +166,38 @@ function App() {
     }
   }, []);
 
+  /* ---------------- LOGIN / REGISTER ---------------- */
   if (!token) {
     return (
       <div className="auth">
         <h2>Login / Register</h2>
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button onClick={login}>Login</button>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            login();
+          }}
+        >
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <button type="submit">Login</button>
+        </form>
       </div>
     );
   }
 
+  /* ---------------- APP UI ---------------- */
   return (
     <div className="app">
       <header>
@@ -193,6 +209,7 @@ function App() {
       </header>
 
       <div className="notes">
+        {/* New Note Form */}
         {editingId === "new" && (
           <div className="note">
             <input
@@ -222,6 +239,7 @@ function App() {
           </div>
         )}
 
+        {/* Notes List */}
         {notes.map((note) => (
           <div key={note._id} className="note">
             {editingId === note._id ? (
