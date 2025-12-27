@@ -5,47 +5,70 @@ function App() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  // Fetch all notes from the database
+  // Track which note is being edited
+  const [editingId, setEditingId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+
+  // Fetch all notes
   const fetchNotes = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/notes");
-      const data = await res.json();
-      setNotes(data);
-    } catch (err) {
-      console.error("Error fetching notes:", err);
-    }
+    const res = await fetch("http://localhost:5000/notes");
+    const data = await res.json();
+    setNotes(data);
   };
 
-  // Run once when the app loads
   useEffect(() => {
     fetchNotes();
   }, []);
 
-  // Send a new note to the server
+  // Add new note
   const addNote = async () => {
-    try {
-      await fetch("http://localhost:5000/notes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ title, content }),
-      });
+    await fetch("http://localhost:5000/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, content }),
+    });
 
-      setTitle("");
-      setContent("");
+    setTitle("");
+    setContent("");
+    fetchNotes();
+  };
 
-      // Re-fetch all notes from DB
-      fetchNotes();
-    } catch (err) {
-      console.error("Error adding note:", err);
-    }
+  // Delete note
+  const deleteNote = async (id) => {
+    await fetch(`http://localhost:5000/notes/${id}`, {
+      method: "DELETE",
+    });
+    fetchNotes();
+  };
+
+  // Start editing
+  const startEdit = (note) => {
+    setEditingId(note._id);
+    setEditTitle(note.title);
+    setEditContent(note.content);
+  };
+
+  // Save updated note
+  const saveEdit = async (id) => {
+    await fetch(`http://localhost:5000/notes/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: editTitle,
+        content: editContent,
+      }),
+    });
+
+    setEditingId(null);
+    fetchNotes();
   };
 
   return (
     <div style={{ padding: "2rem" }}>
       <h1>Notes App</h1>
 
+      {/* Create note */}
       <input
         placeholder="Title"
         value={title}
@@ -77,8 +100,41 @@ function App() {
             marginBottom: "1rem",
           }}
         >
-          <h3>{note.title}</h3>
-          <p>{note.content}</p>
+          {/* Edit mode */}
+          {editingId === note._id ? (
+            <>
+              <input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+
+              <br /><br />
+
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+              />
+
+              <br /><br />
+
+              <button onClick={() => saveEdit(note._id)}>Save</button>
+              <button onClick={() => setEditingId(null)}>Cancel</button>
+            </>
+          ) : (
+            <>
+              {/* View mode */}
+              <h3>{note.title}</h3>
+              <p>{note.content}</p>
+
+              <button onClick={() => startEdit(note)}>Edit</button>
+              <button
+                onClick={() => deleteNote(note._id)}
+                style={{ marginLeft: "0.5rem", background: "red", color: "white" }}
+              >
+                Delete
+              </button>
+            </>
+          )}
         </div>
       ))}
     </div>
