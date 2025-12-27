@@ -1,36 +1,50 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function App() {
+  const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  const sendNote = async () => {
+  // Fetch all notes from the database
+  const fetchNotes = async () => {
     try {
-      const response = await fetch("http://localhost:5000/notes", {
+      const res = await fetch("http://localhost:5000/notes");
+      const data = await res.json();
+      setNotes(data);
+    } catch (err) {
+      console.error("Error fetching notes:", err);
+    }
+  };
+
+  // Run once when the app loads
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
+  // Send a new note to the server
+  const addNote = async () => {
+    try {
+      await fetch("http://localhost:5000/notes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title,
-          content,
-        }),
+        body: JSON.stringify({ title, content }),
       });
 
-      const data = await response.json();
-      console.log("Saved note:", data);
-
-      alert("Note sent to server!");
       setTitle("");
       setContent("");
+
+      // Re-fetch all notes from DB
+      fetchNotes();
     } catch (err) {
-      console.error("Error sending note:", err);
+      console.error("Error adding note:", err);
     }
   };
 
   return (
     <div style={{ padding: "2rem" }}>
-      <h1>Send Note</h1>
+      <h1>Notes App</h1>
 
       <input
         placeholder="Title"
@@ -48,7 +62,25 @@ function App() {
 
       <br /><br />
 
-      <button onClick={sendNote}>Send to Server</button>
+      <button onClick={addNote}>Add Note</button>
+
+      <hr />
+
+      <h2>All Notes</h2>
+
+      {notes.map((note) => (
+        <div
+          key={note._id}
+          style={{
+            border: "1px solid #ccc",
+            padding: "1rem",
+            marginBottom: "1rem",
+          }}
+        >
+          <h3>{note.title}</h3>
+          <p>{note.content}</p>
+        </div>
+      ))}
     </div>
   );
 }
