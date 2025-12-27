@@ -22,6 +22,7 @@ app.use(cors());
 // Enable JSON body parsing (req.body)
 app.use(express.json());
 
+
 /* --------------------- DATABASE CONNECTION --------------------- */
 
 // Connect to MongoDB using the connection string from .env
@@ -72,6 +73,10 @@ const Note = mongoose.model("Note", noteSchema);
  * GET /notes
  * Fetch all notes from the database
  */
+
+app.get("/", (req, res) => {
+  res.send("Notes API is running");
+});
 app.get("/notes", async (req, res) => {
   try {
     // Find all notes and sort pinned ones first, newest first
