@@ -1,42 +1,190 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+/* RESET */
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f4f5f7;
+  color: #222;
+  display: flex;
+  justify-content: center;
+}
+
+/* ---------------- AUTH ---------------- */
+
+.auth {
+  width: 460px;
+  margin-top: 120px;
+  padding: 28px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+}
+
+.auth h2 {
+  margin-bottom: 18px;
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.auth input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 1rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.auth button {
+  width: 100%;
+  padding: 12px;
+  background: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* ---------------- APP ---------------- */
+
+.app {
+  width: 100%;
+  max-width: 1500px; /* extra-wide app */
+  padding: 32px 24px;
 }
 
-.card {
-  padding: 2em;
+/* ---------------- HEADER ---------------- */
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
 }
 
-.read-the-docs {
-  color: #888;
+header h1 {
+  margin: 0;
+  font-size: 2rem; /* slightly bigger header */
+}
+
+header button {
+  margin-left: 10px;
+  padding: 10px 18px; /* bigger buttons */
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+header button:first-of-type {
+  background: #4f46e5;
+  color: white;
+}
+
+header button:last-of-type {
+  background: #e5e7eb;
+}
+
+/* ---------------- NOTE FORM ---------------- */
+
+.note-form {
+  max-width: 1000px; /* much wider form */
+  margin: 0 auto 28px;
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+}
+
+.note-form input,
+.note-form textarea {
+  width: 100%;
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 1rem;
+}
+
+.note-form textarea {
+  min-height: 180px; /* taller textarea */
+  resize: vertical;
+}
+
+.note-form button {
+  background: #4f46e5;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+/* ---------------- NOTES GRID ---------------- */
+
+.notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(680px, 1fr)); /* double-width cards */
+  gap: 28px;
+}
+
+/* ---------------- NOTE CARD ---------------- */
+
+.note {
+  background: white;
+  padding: 28px; /* bigger padding */
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.note h3 {
+  margin: 0 0 14px;
+  font-size: 1.4rem; /* larger title */
+}
+
+.note ul {
+  padding-left: 22px;
+  margin: 0 0 14px;
+}
+
+.note li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+  font-size: 1rem; /* larger content */
+}
+
+/* ---------------- TIMESTAMP ---------------- */
+
+.timestamp {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: auto;
+}
+
+/* ---------------- ACTIONS ---------------- */
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.actions button {
+  background: none;
+  border: none;
+  color: #4f46e5;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 1rem; /* bigger buttons */
+}
+
+.actions button:hover {
+  text-decoration: underline;
 }

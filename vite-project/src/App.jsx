@@ -1,35 +1,33 @@
 import { useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
+import "./App.css";
 
+const API = "http://localhost:5000";
 
 function App() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [notes, setNotes] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-  const [showAddForm, setShowAddForm] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  const [editingId, setEditingId] = useState(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editContent, setEditContent] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const API = "http://localhost:5000";
+  /* ---------------- AUTH ---------------- */
 
-  /* ---------------- LOGOUT ---------------- */
   const logout = () => {
     setToken("");
     localStorage.removeItem("token");
     setNotes([]);
-    alert("Session expired. Please log in again.");
+    alert("Logged out or session expired.");
   };
 
-  /* ---------------- AUTO LOGOUT ---------------- */
-  const scheduleAutoLogout = (jwtToken) => {
+  const scheduleAutoLogout = (token) => {
     try {
-      const decoded = jwtDecode(jwtToken);
+      const decoded = jwtDecode(token);
       const expiresAt = decoded.exp * 1000;
       const timeLeft = expiresAt - Date.now();
 
@@ -38,22 +36,12 @@ function App() {
         return;
       }
 
-      setTimeout(logout, timeLeft);
+      setTimeout(() => {
+        logout();
+      }, timeLeft);
     } catch {
       logout();
     }
-  };
-
-  /* ---------------- AUTH ---------------- */
-  const register = async () => {
-    const res = await fetch(`${API}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await res.json();
-    alert(data.message);
   };
 
   const login = async () => {
@@ -76,6 +64,7 @@ function App() {
   };
 
   /* ---------------- NOTES ---------------- */
+
   const fetchNotes = async (jwt = token) => {
     if (!jwt) return;
 
@@ -83,24 +72,18 @@ function App() {
       headers: { Authorization: `Bearer ${jwt}` },
     });
 
-    if (res.status === 401) {
-      logout();
-      return;
-    }
-
     const data = await res.json();
     setNotes(data);
   };
 
-  const openAddForm = () => {
-    setShowAddForm(true);
-    setTitle("");
-    setContent("• ");
-  };
+  const saveNote = async () => {
+    const method = editingId ? "PUT" : "POST";
+    const url = editingId
+      ? `${API}/notes/${editingId}`
+      : `${API}/notes`;
 
-  const addNote = async () => {
-    await fetch(`${API}/notes`, {
-      method: "POST",
+    await fetch(url, {
+      method,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
@@ -108,7 +91,10 @@ function App() {
       body: JSON.stringify({ title, content }),
     });
 
-    setShowAddForm(false);
+    setTitle("");
+    setContent("");
+    setEditingId(null);
+    setShowForm(false);
     fetchNotes();
   };
 
@@ -123,28 +109,60 @@ function App() {
 
   const startEdit = (note) => {
     setEditingId(note._id);
-    setEditTitle(note.title);
-    setEditContent(note.content);
+    setTitle(note.title);
+    setContent(note.content);
+    setShowForm(true);
   };
 
-  const saveEdit = async (id) => {
-    await fetch(`${API}/notes/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        title: editTitle,
-        content: editContent,
-      }),
-    });
+  /* ---------------- UTIL ---------------- */
 
-    setEditingId(null);
-    fetchNotes();
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  // ---------------- BULLET HANDLING ----------------
+  const handleContentChange = (e) => {
+    const textarea = e.target;
+    let value = textarea.value;
+    const selectionStart = textarea.selectionStart;
+
+    // If empty, start with bullet
+    if (value === "") {
+      setContent("• ");
+      return;
+    }
+
+    // Get the line where the cursor is
+    const beforeCursor = value.slice(0, selectionStart);
+    const afterCursor = value.slice(selectionStart);
+
+    const lines = beforeCursor.split("\n");
+    const currentLine = lines[lines.length - 1];
+
+    // If user pressed Enter at any line, add bullet
+    if (currentLine === "" || currentLine === "• ") {
+      setContent(beforeCursor + "• " + afterCursor);
+
+      // Move cursor to after the bullet
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd =
+          beforeCursor.length + 2;
+      }, 0);
+      return;
+    }
+
+    // If user pressed Enter at the very end
+    if (value.endsWith("\n")) {
+      setContent(value + "• ");
+      return;
+    }
+
+    // Otherwise just set content
+    setContent(value);
   };
 
   /* ---------------- INIT ---------------- */
+
   useEffect(() => {
     if (token) {
       scheduleAutoLogout(token);
@@ -152,109 +170,84 @@ function App() {
     }
   }, []);
 
-  /* ---------------- RENDER ---------------- */
+  /* ---------------- UI ---------------- */
+
   if (!token) {
     return (
-      <div style={{ padding: "2rem" }}>
-        <h1>Login / Register</h1>
+      <div className="auth">
+        <h2>Login / Register</h2>
         <input
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <br /><br />
         <input
           type="password"
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <br /><br />
         <button onClick={login}>Login</button>
-        <button onClick={register} style={{ marginLeft: "1rem" }}>
-          Register
-        </button>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: "2rem" }}>
-      <h1>Your Notes</h1>
-      <button onClick={logout}>Logout</button>
-      <button
-        onClick={openAddForm}
-        style={{
-          marginLeft: "1rem",
-          fontSize: "1.5rem",
-          borderRadius: "50%",
-        }}
-      >
-        +
-      </button>
+    <div className="app">
+      <header>
+        <h1>Notes</h1>
+        <div>
+          <button
+            onClick={() => {
+              setShowForm(true);
+              setEditingId(null);
+              setTitle("");
+              setContent("• "); // start new note with bullet
+            }}
+          >
+            ＋
+          </button>
+          <button onClick={logout}>Logout</button>
+        </div>
+      </header>
 
-      {showAddForm && (
-        <div style={{ marginTop: "1rem" }}>
+      {showForm && (
+        <div className="note-form">
           <input
             placeholder="Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
-          <br />
           <textarea
+            placeholder="• Start typing..."
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                setContent((prev) => prev + "\n• ");
-              }
-            }}
-            style={{ width: "300px", minHeight: "80px" }}
+            onChange={handleContentChange}
           />
-          <br />
-          <button onClick={addNote}>Add</button>
+          <button onClick={saveNote}>
+            {editingId ? "Update Note" : "Add Note"}
+          </button>
         </div>
       )}
 
-      <hr />
-
-      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+      <div className="notes">
         {notes.map((note) => (
-          <div key={note._id} style={{ border: "1px solid #ccc", padding: "1rem", width: "220px" }}>
-            {editingId === note._id ? (
-              <>
-                <input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                />
-                <textarea
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      setEditContent((prev) => prev + "\n• ");
-                    }
-                  }}
-                  style={{ width: "100%", minHeight: "80px" }}
-                />
-                <button onClick={() => saveEdit(note._id)}>Save</button>
-              </>
-            ) : (
-              <>
-                <h3>{note.title}</h3>
-                <ul>
-                  {note.content
-                    .split("\n")
-                    .map((line, i) => (
-                      <li key={i}>{line.replace(/^• /, "")}</li>
-                    ))}
-                </ul>
-                <button onClick={() => startEdit(note)}>Edit</button>
-                <button onClick={() => deleteNote(note._id)}>Delete</button>
-              </>
-            )}
+          <div key={note._id} className="note">
+            <h3>{note.title}</h3>
+            <ul>
+              {note.content
+                .split("\n")
+                .filter(Boolean)
+                .map((line, i) => (
+                  <li key={i}>{line.replace(/^•\s?/, "")}</li>
+                ))}
+            </ul>
+            <small className="timestamp">
+              Last updated: {formatDate(note.updatedAt)}
+            </small>
+            <div className="actions">
+              <button onClick={() => startEdit(note)}>Edit</button>
+              <button onClick={() => deleteNote(note._id)}>Delete</button>
+            </div>
           </div>
         ))}
       </div>
