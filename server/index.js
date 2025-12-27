@@ -1,166 +1,120 @@
-// Import Express – the web framework we use to create the API
 import express from "express";
-
-// Import Mongoose – used to connect to MongoDB and define schemas/models
 import mongoose from "mongoose";
-
-// Import CORS – allows your frontend to talk to this backend
 import cors from "cors";
-
-// Import dotenv – lets us use environment variables from a .env file
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
-// Load environment variables (MONGO_URI, etc.)
+// Import models
+import User from "./models/User.js";
+import Note from "./models/Note.js";
+
+// Import JWT middleware
+import authMiddleware from "./middleware/authMiddleware.js";
+
 dotenv.config();
 
-// Create an Express application
 const app = express();
-
-// Enable CORS for all routes
 app.use(cors());
-
-// Enable JSON body parsing (req.body)
 app.use(express.json());
 
-
-/* --------------------- DATABASE CONNECTION --------------------- */
-
-// Connect to MongoDB using the connection string from .env
+/* --------------------- DATABASE --------------------- */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .catch((err) => console.error(err));
 
-/* --------------------- NOTE SCHEMA --------------------- */
+/* --------------------- AUTH ROUTES --------------------- */
 
-// A Schema defines the shape of documents in a MongoDB collection
-const noteSchema = new mongoose.Schema(
-  {
-    // Title of the note (required)
-    title: {
-      type: String,
-      required: true,
-    },
-
-    // Main text content of the note (required)
-    content: {
-      type: String,
-      required: true,
-    },
-
-    // Whether the note is pinned or not
-    pinned: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  {
-    // Automatically adds createdAt and updatedAt fields
-    timestamps: true,
-  }
-);
-
-/*
-  Create a Model from the schema.
-  - "Note" is the model name
-  - MongoDB will create a "notes" collection automatically
-*/
-const Note = mongoose.model("Note", noteSchema);
-
-/* --------------------- ROUTES --------------------- */
-
-/**
- * GET /notes
- * Fetch all notes from the database
- */
-
-app.get("/", (req, res) => {
-  res.send("Notes API is running");
-});
-app.get("/notes", async (req, res) => {
+// Register new user
+app.post("/auth/register", async (req, res) => {
   try {
-    // Find all notes and sort pinned ones first, newest first
-    const notes = await Note.find().sort({
-      pinned: -1,
-      createdAt: -1,
-    });
+    const email = req.body.email.toLowerCase();
+    const password = req.body.password;
 
-    // Send the notes as JSON
-    res.json(notes);
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new User({ email, password: hashedPassword });
+    await user.save();
+
+    res.status(201).json({ message: "User registered" });
   } catch (err) {
-    // If something goes wrong, return a 500 error
     res.status(500).json({ error: err.message });
   }
 });
 
-/**
- * POST /notes
- * Create a new note
- */
-app.post("/notes", async (req, res) => {
+
+// Login user
+app.post("/auth/login", async (req, res) => {
   try {
-    /*
-      req.body should look like:
-      {
-        "title": "My Note",
-        "content": "This is my note",
-        "pinned": true
-      }
-    */
+    const email = req.body.email.toLowerCase();
+    const password = req.body.password;
 
-    // Create a new Note document
-    const note = new Note(req.body);
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
-    // Save it to MongoDB
-    await note.save();
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-    // Return the saved note with a 201 (created) status
-    res.status(201).json(note);
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
+
+    res.json({ token });
   } catch (err) {
-    // Validation errors end up here
-    res.status(400).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-/**
- * PUT /notes/:id
- * Update an existing note
- */
-app.put("/notes/:id", async (req, res) => {
-  try {
-    // Find the note by ID and update it
-    const updatedNote = await Note.findByIdAndUpdate(
-      req.params.id, // ID from the URL
-      req.body,      // New data
-      { new: true }  // Return the updated document
-    );
+/* --------------------- NOTES ROUTES (PROTECTED) --------------------- */
 
-    // Send back the updated note
-    res.json(updatedNote);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+// Get all notes for logged-in user
+app.get("/notes", authMiddleware, async (req, res) => {
+  const notes = await Note.find({ user: req.userId }).sort({ createdAt: -1 });
+  res.json(notes);
 });
 
-/**
- * DELETE /notes/:id
- * Delete a note
- */
-app.delete("/notes/:id", async (req, res) => {
-  try {
-    // Remove the note from MongoDB
-    await Note.findByIdAndDelete(req.params.id);
+// Create a new note for logged-in user
+app.post("/notes", authMiddleware, async (req, res) => {
+  const note = new Note({
+    title: req.body.title,
+    content: req.body.content,
+    user: req.userId,
+  });
 
-    // Send confirmation
-    res.json({ message: "Note deleted" });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  await note.save();
+  res.status(201).json(note);
+});
+
+// Update a note (only owner)
+app.put("/notes/:id", authMiddleware, async (req, res) => {
+  const note = await Note.findOneAndUpdate(
+    { _id: req.params.id, user: req.userId },
+    req.body,
+    { new: true }
+  );
+
+  if (!note) return res.status(404).json({ message: "Note not found" });
+
+  res.json(note);
+});
+
+// Delete a note (only owner)
+app.delete("/notes/:id", authMiddleware, async (req, res) => {
+  const note = await Note.findOneAndDelete({ _id: req.params.id, user: req.userId });
+
+  if (!note) return res.status(404).json({ message: "Note not found" });
+
+  res.json({ message: "Note deleted" });
 });
 
 /* --------------------- SERVER START --------------------- */
 
-// Start the server on port 5000
 app.listen(5000, () => {
   console.log("Server running on http://localhost:5000");
 });
