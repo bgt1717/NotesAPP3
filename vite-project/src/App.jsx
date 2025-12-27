@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-// Vite-compatible jwt-decode import
 import { default as jwtDecode } from "jwt-decode";
 import "./App.css";
 
@@ -12,8 +11,12 @@ function App() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
+  const [addingNote, setAddingNote] = useState(false); // toggles + form
 
-  // Decode JWT whenever token changes
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+
   useEffect(() => {
     if (token) {
       try {
@@ -28,7 +31,6 @@ function App() {
     }
   }, [token]);
 
-  // Fetch notes for logged-in user
   useEffect(() => {
     if (token) {
       fetch(`${API}/notes`, {
@@ -40,7 +42,6 @@ function App() {
     }
   }, [token]);
 
-  // Add new note
   const handleAddNote = async () => {
     if (!title || !content) return;
 
@@ -57,9 +58,9 @@ function App() {
     setNotes([...notes, newNote]);
     setTitle("");
     setContent("");
+    setAddingNote(false);
   };
 
-  // Delete note
   const handleDelete = async (id) => {
     await fetch(`${API}/notes/${id}`, {
       method: "DELETE",
@@ -68,14 +69,38 @@ function App() {
     setNotes(notes.filter((note) => note._id !== id));
   };
 
-  // Logout
+  const startEditing = (note) => {
+    setEditingNoteId(note._id);
+    setEditTitle(note.title);
+    setEditContent(note.content);
+  };
+
+  const cancelEditing = () => {
+    setEditingNoteId(null);
+    setEditTitle("");
+    setEditContent("");
+  };
+
+  const saveEdit = async (id) => {
+    const res = await fetch(`${API}/notes/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ title: editTitle, content: editContent }),
+    });
+    const updatedNote = await res.json();
+    setNotes(notes.map((note) => (note._id === id ? updatedNote : note)));
+    cancelEditing();
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     setToken("");
     setUser(null);
   };
 
-  // Login
   const handleLogin = async (e) => {
     e.preventDefault();
     const email = e.target.email.value;
@@ -96,7 +121,6 @@ function App() {
     }
   };
 
-  // Register
   const handleRegister = async (e) => {
     e.preventDefault();
     const email = e.target.email.value;
@@ -118,7 +142,6 @@ function App() {
     }
   };
 
-  // Auth form
   if (!user) {
     return (
       <div className="auth">
@@ -149,7 +172,6 @@ function App() {
     );
   }
 
-  // Notes app
   return (
     <div style={{ padding: "20px" }}>
       <header>
@@ -157,37 +179,87 @@ function App() {
         <button onClick={handleLogout}>Logout</button>
       </header>
 
-      <div className="note-form">
-        <input
-          className="note-input"
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <textarea
-          className="note-textarea"
-          placeholder="Content"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        ></textarea>
-        <button onClick={handleAddNote}>Add Note</button>
-      </div>
+      {/* + button to toggle add note form */}
+      {!addingNote ? (
+        <button
+          style={{
+            fontSize: "1.5rem",
+            padding: "10px 20px",
+            borderRadius: "12px",
+            marginBottom: "20px",
+            cursor: "pointer",
+          }}
+          onClick={() => setAddingNote(true)}
+        >
+          + Add Note
+        </button>
+      ) : (
+        <div className="note-form">
+          <input
+            className="note-input"
+            placeholder="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <textarea
+            className="note-textarea"
+            placeholder="Content"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          ></textarea>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button onClick={handleAddNote}>Add</button>
+            <button
+              onClick={() => {
+                setAddingNote(false);
+                setTitle("");
+                setContent("");
+              }}
+              style={{ backgroundColor: "#f44336" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="notes">
         {notes.map((note) => (
           <div className="note" key={note._id}>
-            <h3>{note.title}</h3>
-            <ul>
-              {note.content.split("\n").map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
-            <div className="timestamp">
-              Last updated: {new Date(note.updatedAt).toLocaleString()}
-            </div>
-            <div className="actions">
-              <button onClick={() => handleDelete(note._id)}>Delete</button>
-            </div>
+            {editingNoteId === note._id ? (
+              <>
+                <input
+                  className="note-input"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                />
+                <textarea
+                  className="note-textarea"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                />
+                <div className="actions">
+                  <button onClick={() => saveEdit(note._id)}>Save</button>
+                  <button onClick={cancelEditing}>Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3>{note.title}</h3>
+                <ul>
+                  {note.content.split("\n").map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+                <div className="timestamp">
+                  Last updated: {new Date(note.updatedAt).toLocaleString()}
+                </div>
+                <div className="actions">
+                  <button onClick={() => startEditing(note)}>Edit</button>
+                  <button onClick={() => handleDelete(note._id)}>Delete</button>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
