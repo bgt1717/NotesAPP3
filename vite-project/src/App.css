@@ -47,6 +47,7 @@ header button:hover {
   background-color: #45a049;
 }
 
+
 /* ------------------- NOTES GRID ------------------- */
 .notes {
   display: grid;
@@ -264,4 +265,30 @@ header button:hover {
 
 .auth button:hover {
   background-color: #45a049;
+}
+
+/* ------------------- MOBILE ICON-ONLY LOGOUT ------------------- */
+@media (max-width: 500px) {
+  header > button {
+    background-color: #e53935 !important;
+    color: white !important;
+    padding: 8px !important;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 0; /* hide text */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  header > button::before {
+    content: "⏻";
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  header > button:hover {
+    background-color: #c62828 !important;
+  }
 }
