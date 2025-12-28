@@ -4,7 +4,7 @@ import "./App.css";
 
 const API = import.meta.env.VITE_API_URL;
 
-/*const API = "http://localhost:5000";*/
+// const API = "http://localhost:5000";
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");

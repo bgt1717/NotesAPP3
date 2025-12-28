@@ -267,4 +267,19 @@ header button:hover {
   background-color: #45a049;
 }
 
+/* ------------------- AUTH RESPONSIVE ------------------- */
+@media (max-width: 650px) {
+  .auth form {
+    width: 90%; /* shrink form width */
+    padding: 20px; /* reduce padding */
+  }
 
+  .auth h2 {
+    font-size: 2rem; /* smaller heading */
+  }
+
+  .auth input,
+  .auth button {
+    font-size: 0.9rem; /* slightly smaller inputs/buttons */
+  }
+}
