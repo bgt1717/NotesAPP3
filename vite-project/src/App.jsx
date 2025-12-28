@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { default as jwtDecode } from "jwt-decode";
 import "./App.css";
 
-const API = "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL;
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
