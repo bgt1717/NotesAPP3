@@ -4,6 +4,8 @@ import "./App.css";
 
 const API = import.meta.env.VITE_API_URL;
 
+/*const API = "http://localhost:5000";*/
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [user, setUser] = useState(null);
@@ -45,12 +47,10 @@ function App() {
   // Prepend bullet to new lines automatically
   const handleContentChange = (setter) => (e) => {
     const value = e.target.value;
-    // Add bullet at start if empty
     let newValue = value;
     if (!value.startsWith("• ")) {
       newValue = "• " + value;
     }
-    // Replace newline without bullet
     newValue = newValue.replace(/\n(?!• )/g, "\n• ");
     setter(newValue);
   };
@@ -186,17 +186,16 @@ function App() {
   }
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div className="app-container">
       <header>
         <h1>Notes App</h1>
-        <button onClick={handleLogout}>Logout</button>
+        <button className="logout-button" onClick={handleLogout}>
+          ⏻
+        </button>
       </header>
 
       {!addingNote ? (
-        <button
-          className="add-note-button"
-          onClick={() => setAddingNote(true)}
-        >
+        <button className="add-note-button" onClick={() => setAddingNote(true)}>
           + Add Note
         </button>
       ) : (
@@ -232,22 +231,24 @@ function App() {
         {notes.map((note) => (
           <div className="note" key={note._id}>
             {editingNoteId === note._id ? (
-              <>
+              <div className="note-form edit-note-form">
                 <input
                   className="note-input"
+                  placeholder="Title"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                 />
                 <textarea
                   className="note-textarea"
+                  placeholder="Content"
                   value={editContent}
                   onChange={handleContentChange(setEditContent)}
-                />
+                ></textarea>
                 <div className="actions">
                   <button onClick={() => saveEdit(note._id)}>Save</button>
                   <button onClick={cancelEditing}>Cancel</button>
                 </div>
-              </>
+              </div>
             ) : (
               <>
                 <h3>{note.title}</h3>
@@ -260,7 +261,7 @@ function App() {
                   Last updated: {new Date(note.updatedAt).toLocaleString()}
                 </div>
                 <div className="actions">
-                  <button onClick={() => startEditing(note)}>Edit</button>
+                  <button onClick={() => startEditing(note)}>✏️</button>
                   <button onClick={() => handleDelete(note._id)}>Delete</button>
                 </div>
               </>
