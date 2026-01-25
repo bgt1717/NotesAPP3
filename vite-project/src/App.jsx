@@ -2,23 +2,35 @@ import { useState, useEffect } from "react";
 import jwtDecode from "jwt-decode";
 import "./App.css";
 
- const API = import.meta.env.VITE_API_URL;
-//onst API = "http://localhost:5000";
+// const API = import.meta.env.VITE_API_URL;
+const API = "http://localhost:5000";
+const DEMO_KEY = "demo_notes";
 
+/* ---------------- DEMO HELPERS ---------------- */
+const loadDemoNotes = () => {
+  try {
+    return JSON.parse(localStorage.getItem(DEMO_KEY)) || [];
+  } catch {
+    return [];
+  }
+};
+
+const saveDemoNotes = (notes) => {
+  localStorage.setItem(DEMO_KEY, JSON.stringify(notes));
+};
+
+/* ---------------- APP ---------------- */
 function App() {
-  // Initialize token safely: remove invalid/expired tokens
   const [token, setToken] = useState(() => {
-    const savedToken = localStorage.getItem("token");
-    if (!savedToken) return "";
-
+    const saved = localStorage.getItem("token");
+    if (!saved) return "";
     try {
-      const decoded = jwtDecode(savedToken);
-      const now = Date.now() / 1000;
-      if (decoded.exp && decoded.exp < now) {
+      const decoded = jwtDecode(saved);
+      if (decoded.exp && decoded.exp < Date.now() / 1000) {
         localStorage.removeItem("token");
         return "";
       }
-      return savedToken;
+      return saved;
     } catch {
       localStorage.removeItem("token");
       return "";
@@ -26,9 +38,12 @@ function App() {
   });
 
   const [user, setUser] = useState(null);
+  const [isDemo, setIsDemo] = useState(false);
+
   const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [addingNote, setAddingNote] = useState(false);
 
@@ -36,32 +51,27 @@ function App() {
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
 
-  // Decode token and set user
+  /* ---------------- AUTH ---------------- */
   useEffect(() => {
     if (!token) {
       setUser(null);
       return;
     }
-
     try {
       const decoded = jwtDecode(token);
-      const now = Date.now() / 1000;
-      if (decoded.exp && decoded.exp < now) {
-        localStorage.removeItem("token");
-        setToken("");
-        setUser(null);
-      } else {
-        setUser(decoded);
-      }
+      setUser(decoded);
     } catch {
-      localStorage.removeItem("token");
-      setToken("");
       setUser(null);
     }
   }, [token]);
 
-  // Fetch notes
+  /* ---------------- LOAD NOTES ---------------- */
   useEffect(() => {
+    if (isDemo) {
+      setNotes(loadDemoNotes());
+      return;
+    }
+
     if (!token) return;
 
     fetch(`${API}/notes`, {
@@ -69,21 +79,36 @@ function App() {
     })
       .then((res) => res.json())
       .then((data) => setNotes(data))
-      .catch((err) => console.error(err));
-  }, [token]);
+      .catch(console.error);
+  }, [token, isDemo]);
 
-  // Prepend bullet to new lines
+  /* ---------------- BULLET HANDLER ---------------- */
   const handleContentChange = (setter) => (e) => {
-    const value = e.target.value;
-    let newValue = value;
-    if (!value.startsWith("• ")) newValue = "• " + value;
-    newValue = newValue.replace(/\n(?!• )/g, "\n• ");
-    setter(newValue);
+    let value = e.target.value;
+    if (!value.startsWith("• ")) value = "• " + value;
+    value = value.replace(/\n(?!• )/g, "\n• ");
+    setter(value);
   };
 
-  // Add note
+  /* ---------------- ADD NOTE ---------------- */
   const handleAddNote = async () => {
     if (!title || !content) return;
+
+    if (isDemo) {
+      const newNote = {
+        _id: crypto.randomUUID(),
+        title,
+        content,
+        updatedAt: new Date().toISOString(),
+      };
+      const updated = [...notes, newNote];
+      setNotes(updated);
+      saveDemoNotes(updated);
+      setTitle("");
+      setContent("");
+      setAddingNote(false);
+      return;
+    }
 
     const res = await fetch(`${API}/notes`, {
       method: "POST",
@@ -101,27 +126,49 @@ function App() {
     setAddingNote(false);
   };
 
-  // Delete note
+  /* ---------------- DELETE ---------------- */
   const handleDelete = async (id) => {
+    if (isDemo) {
+      const updated = notes.filter((n) => n._id !== id);
+      setNotes(updated);
+      saveDemoNotes(updated);
+      return;
+    }
+
     await fetch(`${API}/notes/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
-    setNotes(notes.filter((note) => note._id !== id));
+
+    setNotes(notes.filter((n) => n._id !== id));
   };
 
-  // Edit note
+  /* ---------------- EDIT ---------------- */
   const startEditing = (note) => {
     setEditingNoteId(note._id);
     setEditTitle(note.title);
     setEditContent(note.content);
   };
+
   const cancelEditing = () => {
     setEditingNoteId(null);
     setEditTitle("");
     setEditContent("");
   };
+
   const saveEdit = async (id) => {
+    if (isDemo) {
+      const updated = notes.map((n) =>
+        n._id === id
+          ? { ...n, title: editTitle, content: editContent, updatedAt: new Date().toISOString() }
+          : n
+      );
+      setNotes(updated);
+      saveDemoNotes(updated);
+      cancelEditing();
+      return;
+    }
+
     const res = await fetch(`${API}/notes/${id}`, {
       method: "PUT",
       headers: {
@@ -130,19 +177,19 @@ function App() {
       },
       body: JSON.stringify({ title: editTitle, content: editContent }),
     });
+
     const updatedNote = await res.json();
-    setNotes(notes.map((note) => (note._id === id ? updatedNote : note)));
+    setNotes(notes.map((n) => (n._id === id ? updatedNote : n)));
     cancelEditing();
   };
 
-  // Logout
+  /* ---------------- AUTH ACTIONS ---------------- */
   const handleLogout = () => {
     localStorage.removeItem("token");
     setToken("");
     setUser(null);
   };
 
-  // Login
   const handleLogin = async (e) => {
     e.preventDefault();
     const email = e.target.email.value;
@@ -163,7 +210,6 @@ function App() {
     }
   };
 
-  // Register
   const handleRegister = async (e) => {
     e.preventDefault();
     const email = e.target.email.value;
@@ -185,17 +231,31 @@ function App() {
     }
   };
 
-  // ---------- RENDER ----------
-  if (!user) {
+  /* ---------------- AUTH SCREEN ---------------- */
+  if (!user && !isDemo) {
     return (
       <div className="auth">
         <h2>{isRegistering ? "Register" : "Login"}</h2>
+
         <form onSubmit={isRegistering ? handleRegister : handleLogin}>
-          <input placeholder="Email" name="email" type="email" required />
-          <input placeholder="Password" name="password" type="password" required />
+          <input name="email" type="email" placeholder="Email" required />
+          <input name="password" type="password" placeholder="Password" required />
           <button type="submit">{isRegistering ? "Register" : "Login"}</button>
         </form>
-        <p style={{ marginTop: "10px" }}>
+
+        <button
+          onClick={() => setIsDemo(true)}
+          style={{
+            background: "transparent",
+            border: "2px dashed #4caf50",
+            color: "#4caf50",
+            padding: "10px",
+          }}
+        >
+          Try Demo
+        </button>
+
+        <p>
           {isRegistering ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
             onClick={() => setIsRegistering(!isRegistering)}
@@ -205,8 +265,6 @@ function App() {
               color: "#2196f3",
               cursor: "pointer",
               textDecoration: "underline",
-              padding: 0,
-              fontSize: "1rem",
             }}
           >
             {isRegistering ? "Login" : "Register"}
@@ -216,11 +274,21 @@ function App() {
     );
   }
 
+  /* ---------------- APP UI ---------------- */
   return (
     <div className="app-container">
       <header>
-        <h1>Notes App</h1>
-        <button className="logout-button" onClick={handleLogout}>⏻</button>
+        <h1>Notes App {isDemo && "(Demo Mode)"}</h1>
+        <div>
+          {isDemo && (
+            <button onClick={() => setIsDemo(false)}>Exit Demo</button>
+          )}
+          {user && (
+            <button className="logout-button" onClick={handleLogout}>
+              ⏻
+            </button>
+          )}
+        </div>
       </header>
 
       {!addingNote ? (
@@ -240,18 +308,10 @@ function App() {
             placeholder="Content"
             value={content}
             onChange={handleContentChange(setContent)}
-          ></textarea>
+          />
           <div className="actions">
             <button onClick={handleAddNote}>Add</button>
-            <button
-              onClick={() => {
-                setAddingNote(false);
-                setTitle("");
-                setContent("");
-              }}
-            >
-              Cancel
-            </button>
+            <button onClick={() => setAddingNote(false)}>Cancel</button>
           </div>
         </div>
       )}
@@ -263,16 +323,14 @@ function App() {
               <div className="note-form edit-note-form">
                 <input
                   className="note-input"
-                  placeholder="Title"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                 />
                 <textarea
                   className="note-textarea"
-                  placeholder="Content"
                   value={editContent}
                   onChange={handleContentChange(setEditContent)}
-                ></textarea>
+                />
                 <div className="actions">
                   <button onClick={() => saveEdit(note._id)}>Save</button>
                   <button onClick={cancelEditing}>Cancel</button>
@@ -282,8 +340,8 @@ function App() {
               <>
                 <h3>{note.title}</h3>
                 <ul>
-                  {note.content.split("\n").map((line, i) => (
-                    <li key={i}>{line.replace(/^• /, "")}</li>
+                  {note.content.split("\n").map((l, i) => (
+                    <li key={i}>{l.replace(/^• /, "")}</li>
                   ))}
                 </ul>
                 <div className="timestamp">
