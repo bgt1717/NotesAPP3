@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import jwtDecode from "jwt-decode";
 import "./App.css";
-import T3Image from "./assets/t3.svg";
-
 
 const API = import.meta.env.VITE_API_URL;
 //const API = "http://localhost:5000";
@@ -234,21 +232,26 @@ function App() {
   };
 
   /* ---------------- AUTH SCREEN ---------------- */
-if (!user && !isDemo) {
-  return (
-    <div className="auth auth-layout">
-      <div className="auth-card">
+  if (!user && !isDemo) {
+    return (
+      <div className="auth">
         <h2>{isRegistering ? "Register" : "Login"}</h2>
 
         <form onSubmit={isRegistering ? handleRegister : handleLogin}>
           <input name="email" type="email" placeholder="Email" required />
           <input name="password" type="password" placeholder="Password" required />
-          <button type="submit">
-            {isRegistering ? "Register" : "Login"}
-          </button>
+          <button type="submit">{isRegistering ? "Register" : "Login"}</button>
         </form>
 
-        <button className="demo-button" onClick={() => setIsDemo(true)}>
+        <button
+          onClick={() => setIsDemo(true)}
+          style={{
+            background: "transparent",
+            border: "2px dashed #4caf50",
+            color: "#4caf50",
+            padding: "10px",
+          }}
+        >
           Try Demo
         </button>
 
@@ -256,20 +259,20 @@ if (!user && !isDemo) {
           {isRegistering ? "Already have an account?" : "Don't have an account?"}{" "}
           <button
             onClick={() => setIsRegistering(!isRegistering)}
-            className="link-button"
+            style={{
+              background: "none",
+              border: "none",
+              color: "#2196f3",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
           >
             {isRegistering ? "Login" : "Register"}
           </button>
         </p>
       </div>
-
-      <div className="auth-image">
-        <img src={T3Image} alt="Notes illustration" />
-      </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   /* ---------------- APP UI ---------------- */
   return (
