@@ -1,13 +1,30 @@
 import { useState, useEffect } from "react";
-import { default as jwtDecode } from "jwt-decode";
+import jwtDecode from "jwt-decode";
 import "./App.css";
 
-const API = import.meta.env.VITE_API_URL;
-
-// const API = "http://localhost:5000";
+// const API = import.meta.env.VITE_API_URL;
+const API = "http://localhost:5000";
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  // Initialize token safely: remove invalid/expired tokens
+  const [token, setToken] = useState(() => {
+    const savedToken = localStorage.getItem("token");
+    if (!savedToken) return "";
+
+    try {
+      const decoded = jwtDecode(savedToken);
+      const now = Date.now() / 1000;
+      if (decoded.exp && decoded.exp < now) {
+        localStorage.removeItem("token");
+        return "";
+      }
+      return savedToken;
+    } catch {
+      localStorage.removeItem("token");
+      return "";
+    }
+  });
+
   const [user, setUser] = useState(null);
   const [notes, setNotes] = useState([]);
   const [title, setTitle] = useState("");
@@ -19,42 +36,52 @@ function App() {
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
 
+  // Decode token and set user
   useEffect(() => {
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setUser(decoded);
-      } catch (err) {
-        console.error("Invalid token", err);
+    if (!token) {
+      setUser(null);
+      return;
+    }
+
+    try {
+      const decoded = jwtDecode(token);
+      const now = Date.now() / 1000;
+      if (decoded.exp && decoded.exp < now) {
+        localStorage.removeItem("token");
+        setToken("");
         setUser(null);
+      } else {
+        setUser(decoded);
       }
-    } else {
+    } catch {
+      localStorage.removeItem("token");
+      setToken("");
       setUser(null);
     }
   }, [token]);
 
+  // Fetch notes
   useEffect(() => {
-    if (token) {
-      fetch(`${API}/notes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-        .then((res) => res.json())
-        .then((data) => setNotes(data))
-        .catch((err) => console.error(err));
-    }
+    if (!token) return;
+
+    fetch(`${API}/notes`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setNotes(data))
+      .catch((err) => console.error(err));
   }, [token]);
 
-  // Prepend bullet to new lines automatically
+  // Prepend bullet to new lines
   const handleContentChange = (setter) => (e) => {
     const value = e.target.value;
     let newValue = value;
-    if (!value.startsWith("• ")) {
-      newValue = "• " + value;
-    }
+    if (!value.startsWith("• ")) newValue = "• " + value;
     newValue = newValue.replace(/\n(?!• )/g, "\n• ");
     setter(newValue);
   };
 
+  // Add note
   const handleAddNote = async () => {
     if (!title || !content) return;
 
@@ -74,6 +101,7 @@ function App() {
     setAddingNote(false);
   };
 
+  // Delete note
   const handleDelete = async (id) => {
     await fetch(`${API}/notes/${id}`, {
       method: "DELETE",
@@ -82,18 +110,17 @@ function App() {
     setNotes(notes.filter((note) => note._id !== id));
   };
 
+  // Edit note
   const startEditing = (note) => {
     setEditingNoteId(note._id);
     setEditTitle(note.title);
     setEditContent(note.content);
   };
-
   const cancelEditing = () => {
     setEditingNoteId(null);
     setEditTitle("");
     setEditContent("");
   };
-
   const saveEdit = async (id) => {
     const res = await fetch(`${API}/notes/${id}`, {
       method: "PUT",
@@ -108,12 +135,14 @@ function App() {
     cancelEditing();
   };
 
+  // Logout
   const handleLogout = () => {
     localStorage.removeItem("token");
     setToken("");
     setUser(null);
   };
 
+  // Login
   const handleLogin = async (e) => {
     e.preventDefault();
     const email = e.target.email.value;
@@ -134,6 +163,7 @@ function App() {
     }
   };
 
+  // Register
   const handleRegister = async (e) => {
     e.preventDefault();
     const email = e.target.email.value;
@@ -155,6 +185,7 @@ function App() {
     }
   };
 
+  // ---------- RENDER ----------
   if (!user) {
     return (
       <div className="auth">
@@ -189,9 +220,7 @@ function App() {
     <div className="app-container">
       <header>
         <h1>Notes App</h1>
-        <button className="logout-button" onClick={handleLogout}>
-          ⏻
-        </button>
+        <button className="logout-button" onClick={handleLogout}>⏻</button>
       </header>
 
       {!addingNote ? (
@@ -199,7 +228,7 @@ function App() {
           + Add Note
         </button>
       ) : (
-        <div className="note-form">
+        <div className="note-form add-note">
           <input
             className="note-input"
             placeholder="Title"
