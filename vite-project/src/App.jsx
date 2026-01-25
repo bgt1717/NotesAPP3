@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import jwtDecode from "jwt-decode";
 import "./App.css";
 
-// const API = import.meta.env.VITE_API_URL;
+// const API = import.meta.env.VITE_API_URL; TEST
 const API = "http://localhost:5000";
 
 function App() {
