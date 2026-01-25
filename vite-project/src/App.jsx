@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import jwtDecode from "jwt-decode";
 import "./App.css";
 
-// const API = import.meta.env.VITE_API_URL;
-const API = "http://localhost:5000";
+ const API = import.meta.env.VITE_API_URL;
+//onst API = "http://localhost:5000";
 
 function App() {
   // Initialize token safely: remove invalid/expired tokens
